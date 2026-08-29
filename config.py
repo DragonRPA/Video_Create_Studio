@@ -126,15 +126,17 @@ class StudioConfig:
     slm_temperature: float = 0.4
     slm_max_tokens: int = 1024
 
-    # 모델 가중치 파일명
-    minimax_dit_model: str = "MiniMax_H3_fv8_scaled.safetensors"
-    text_encoder_model: str = "mvfp4_t5_xxl.safetensors"
-    vae_model: str = "minimax_vae.safetensors"
+    # 공식 검증 가중치 모델 파일명 (Comfy-Org/MiniMax-H3 기준)
+    minimax_dit_model: str = "minimax_h3_fl2va_pruned_fp8_scaled.safetensors"
+    minimax_r2v_model: str = "minimax_h3_ref2va_pruned_fp8_scaled.safetensors"
+    text_encoder_model: str = "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"
+    video_vae_model: str = "minimax_h3_video_vae_fp16.safetensors"
+    audio_vae_model: str = "minimax_h3_audio_vae_fp32.safetensors"
 
     # FFmpeg 설정
     ffmpeg_binary: str = "ffmpeg"
     ffprobe_binary: str = "ffprobe"
-    video_codec: str = "libx264"  # or h264_nvenc, libsvtav1, prores_ks
+    video_codec: str = "libx264"
     crf: int = 19
     audio_codec: str = "aac"
     audio_bitrate: str = "192k"
