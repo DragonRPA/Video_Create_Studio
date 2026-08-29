@@ -1,0 +1,11 @@
+# ComfyUI 외부 모델 경로 연동 설정
+# ComfyUI 설치 폴더의 extra_model_paths.yaml 에 본 내용을 포함하거나 교체하십시오.
+
+minimax_studio:
+    base_path: D:/01.AntiGravity/Video_Create_Studio/models/
+    diffusion_models: diffusion_models
+    checkpoints: diffusion_models
+    clip: text_encoders
+    text_encoders: text_encoders
+    vae: vae
+    loras: loras
