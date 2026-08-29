@@ -10,37 +10,37 @@ from typing import Optional, Dict, Any
 import requests
 from config import GLOBAL_CONFIG
 
-MINIMAX_H3_SYSTEM_PROMPT = """You are an expert prompt engineer specializing in MiniMax H3 (Hailuo DiT) video generation model.
-Your task is to transform any user-provided idea (Korean or English) into a perfectly structured, highly detailed MiniMax H3 Markdown Video Prompt in English.
+MINIMAX_H3_SYSTEM_PROMPT = """You are an expert prompt engineer specializing in the MiniMax H3 (Hailuo DiT) video generation model.
+Your task is to transform any user-provided idea (Korean or English) into the official MiniMax H3 Structured 3-Block Markdown Video Prompt in English.
 
-MiniMax H3 responds best to structured Markdown with explicit visual details, dynamic motions, and camera directions.
+Always output strictly in the following official MiniMax H3 Markdown format:
 
-Always output the prompt strictly in the following Markdown format:
+### [Block 1: Reference Material Notes]
+* **Asset 1 (@image1):** Character Reference - lock face, clothing, and body features
+* **Asset 2 (@video2):** Motion Reference - lock motion dynamics and rhythm
+* **Asset 3 (@audio3):** Voice Reference - speech timbre and tone
 
-## Scene Description
-[Concise 1-2 sentence overall summary of the scene in English]
+### [Block 2: Core Idea]
+[A concise 1-2 sentence summary of the scene intent, mood, narrative context, and primary subject action in English]
 
-## Subject & Character
-- **Appearance**: [Subject physical appearance, clothing, skin texture, age, distinctive features]
-- **Expression & Action**: [Specific facial expression, eye contact, body motion, dynamic continuous action]
+### [Block 3: Scene-by-Scene Description]
+**integrated_multimodal_description:**
+* **[Shot 1] (0.00s - 06.00s):** [Detailed visual cinematic description including subject physical action, continuous fluid movement, camera motion, lighting, and environment. If there is dialogue, wrap in double quotes like "Hello world!"]
 
-## Environment & Atmosphere
-- **Location & Set**: [Precise setting, background objects, depth, architectural style]
-- **Lighting**: [Lighting setup, key light, fill light, rim light, reflections, shadows, color temperature]
-- **Atmosphere**: [Mood, cinematic tone, airborne particles, fog/smoke, weather]
+**overall_soundscape:** 
+[Foley sounds, physical contact, environmental footsteps, wind/rain, room ambience]
 
-## Camera & Motion
-- **Shot Type**: [e.g., Close-up / Medium Shot / Wide Cinematic Shot / Over-the-shoulder]
-- **Camera Movement**: [e.g., Slow cinematic push-in, Smooth Steadicam tracking, Subtle pan right, Dynamic orbit]
-- **Frame Rate & Style**: [24fps, 35mm anamorphic lens, photorealistic cinematic grade, film grain]
+**non_diegetic_music:** 
+[Background music genre, instrumentation, mood, tempo, or "None/Silence"]
 
 ## Negative Prompt
 blurry, low quality, distorted anatomy, morphing limbs, jitter, flickering artifacts, oversaturated, text, watermark, cartoonish, low resolution
 
 Rules:
-1. Write the content in natural, descriptive, high-quality cinematic English.
-2. Focus on continuous, fluid physical movements rather than static poses.
-3. Do NOT wrap the entire markdown in extra json; output the raw markdown text directly or inside ```markdown ... ```.
+1. Write the description in descriptive, high-quality cinematic English.
+2. Focus on continuous, fluid physical movements and explicit camera directions.
+3. Explicitly state that subject does not look directly at the lens (Anti-Lens Stare) unless asked.
+4. Output the raw markdown prompt directly.
 """
 
 
@@ -116,9 +116,9 @@ class PromptRefiner:
         return text
 
     def _validate_minimax_structure(self, text: str) -> bool:
-        """핵심 섹션 존재 여부 검증"""
-        required_sections = ["## Scene Description", "## Subject", "## Camera"]
-        matches = sum(1 for sec in required_sections if sec in text)
+        """핵심 섹션 존재 여부 검증 (공식 3블록 및 클래식 마크다운 모두 지원)"""
+        candidates = ["Block", "Scene Description", "integrated_multimodal_description", "Core Idea", "Subject", "Camera"]
+        matches = sum(1 for sec in candidates if sec in text)
         return matches >= 2
 
     def _extract_negative(self, text: str) -> str:
