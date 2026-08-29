@@ -36,6 +36,14 @@ class StudioApp(tk.Tk):
         self.geometry("1280x880")
         self.minsize(1100, 750)
 
+        # 윈도우 아이콘 설정
+        ico_p = Path(__file__).resolve().parent / "studio_icon.ico"
+        if ico_p.exists():
+            try:
+                self.iconbitmap(str(ico_p))
+            except Exception:
+                pass
+
         self.queue_mgr = TaskQueueManager()
         self.prompt_refiner = PromptRefiner()
         self.comfy_engine = ComfyWorkflowEngine()
