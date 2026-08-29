@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local SQLite databases
+*.db
+*.db-journal
+*.sqlite3
+
+# Large media files and caches
+inputs/*
+!inputs/.gitkeep
+outputs/*
+!outputs/.gitkeep
+models/*
+!models/.gitkeep
+tools/*
+
+# IDE and OS
+.vscode/
+.idea/
+Thumbs.db

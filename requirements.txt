@@ -1,0 +1,5 @@
+# MiniMax H3 Video Create Studio Requirements
+requests>=2.31.0
+websocket-client>=1.6.0
+pydantic>=2.0.0
+ffmpeg-python>=0.2.0
