@@ -29,6 +29,7 @@ from config import (
 from task_queue_manager import TaskQueueManager
 from prompt_refiner import PromptRefiner
 from comfy_workflow_engine import ComfyWorkflowEngine
+from backend_orchestrator import BackendOrchestrator
 
 
 class StudioApp(tk.Tk):
@@ -53,11 +54,38 @@ class StudioApp(tk.Tk):
         self._configure_theme()
         self._build_ui()
 
+        # 창 종료 이벤트 바인딩
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
         # 백그라운드 워커 시작 및 이벤트 바인딩
         self.queue_mgr.start_worker()
         self.queue_mgr.register_listener(self._on_task_updated)
         self._refresh_task_table()
         self._check_system_health()
+
+        # 백엔드(ComfyUI) 자동 기동 점검
+        self._auto_start_backend()
+
+    def _auto_start_backend(self):
+        """앱 시작 시 ComfyUI 백엔드 미실행 상태면 백그라운드 자동 기동"""
+        def start_worker_thread():
+            if not BackendOrchestrator.is_comfy_running():
+                def log_cb(msg):
+                    self.after(0, lambda: self.status_lbl.configure(text=f"백엔드: {msg}", fg="#facc15"))
+
+                BackendOrchestrator.start_backend_async(log_cb)
+                self.after(0, self._check_system_health)
+
+        threading.Thread(target=start_worker_thread, daemon=True).start()
+
+    def _on_close(self):
+        """앱 종료 시 백엔드 및 워커 정리"""
+        try:
+            BackendOrchestrator.stop_backend()
+            self.queue_mgr.stop_worker()
+        except Exception:
+            pass
+        self.destroy()
 
     def _configure_theme(self):
         """다크 테마 및 전사 UI 표준 스타일 설정"""
