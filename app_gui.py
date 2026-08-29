@@ -158,7 +158,7 @@ class StudioApp(tk.Tk):
             bg="#10b981",
             fg="#ffffff",
             bd=0,
-            ipady=8,
+            pady=8,
             font=("Pretendard", 11, "bold"),
             command=self._on_submit_task,
         )
