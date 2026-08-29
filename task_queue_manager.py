@@ -286,11 +286,34 @@ class TaskQueueManager:
             )
 
         except Exception as e:
-            error_str = f"{type(e).__name__}: {str(e)}"
-            print(f"[TaskQueueManager] 태스크({task_id}) 실패: {error_str}")
+            raw_err = f"{type(e).__name__}: {str(e)}"
+            # 사용자 친화적 진단 메시지 생성
+            if "Connection" in raw_err or "refused" in raw_err.lower() or "8188" in raw_err:
+                diagnostic = f"ComfyUI 서버(http://127.0.0.1:{GLOBAL_CONFIG.comfy_port})에 연결할 수 없습니다. ComfyUI를 먼저 실행한 후 [작업 재시도]를 클릭하십시오."
+            elif "out of memory" in raw_err.lower() or "cuda" in raw_err.lower() and "memory" in raw_err.lower():
+                diagnostic = "GPU VRAM 부족(OOM) 오류입니다. 해상도를 848x480으로 낮추거나 하드웨어 프로파일을 VRAM_12GB_ECO로 변경하십시오."
+            elif "timeout" in raw_err.lower():
+                diagnostic = "추론 렌더링 시간이 초과되었습니다 (30분 초과). 백엔드 상태를 점검하십시오."
+            else:
+                diagnostic = raw_err
+
+            print(f"[TaskQueueManager] 태스크({task_id}) 실패: {diagnostic}")
             self.update_task_status(
-                task_id, "FAILED", 0, "오류 발생", error_msg=error_str
+                task_id, "FAILED", 0, "작업 실패", error_msg=diagnostic
             )
+
+    def retry_task(self, task_id: str) -> bool:
+        """실패한 작업을 PENDING 상태로 재등록하여 재실행"""
+        with self._get_conn() as conn:
+            conn.execute(
+                "UPDATE tasks SET status = 'PENDING', progress = 0, progress_msg = '재시도 대기 중', error_message = NULL, updated_at = datetime('now', 'localtime') WHERE id = ?",
+                (task_id,),
+            )
+            conn.commit()
+        updated = self.get_task(task_id)
+        if updated:
+            self._notify_listeners(updated)
+        return True
 
 
 if __name__ == "__main__":

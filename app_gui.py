@@ -293,6 +293,7 @@ class StudioApp(tk.Tk):
 
         self.tree.pack(fill=tk.BOTH, expand=True, pady=(0, 8))
         self.tree.bind("<<TreeviewSelect>>", self._on_select_row)
+        self.tree.bind("<Double-1>", self._on_double_click_row)
 
         # 액션 제어 버튼 바
         action_bar = tk.Frame(parent, bg="#27272a")
@@ -301,16 +302,22 @@ class StudioApp(tk.Tk):
         self.play_btn = tk.Button(action_bar, text="결과 영상 열기", bg="#3b82f6", fg="#ffffff", bd=0, padx=12, pady=6, font=("Pretendard", 9, "bold"), command=self._on_open_video)
         self.play_btn.pack(side=tk.LEFT, padx=(0, 6))
 
+        self.retry_btn = tk.Button(action_bar, text="작업 재시도", bg="#d97706", fg="#ffffff", bd=0, padx=12, pady=6, font=("Pretendard", 9, "bold"), command=self._on_retry_task)
+        self.retry_btn.pack(side=tk.LEFT, padx=(0, 6))
+
         self.folder_btn = tk.Button(action_bar, text="저장 폴더 열기", bg="#52525b", fg="#ffffff", bd=0, padx=12, pady=6, font=("Pretendard", 9), command=self._on_open_folder)
         self.folder_btn.pack(side=tk.LEFT, padx=(0, 6))
 
         self.refresh_btn = tk.Button(action_bar, text="대장 갱신", bg="#3f3f46", fg="#ffffff", bd=0, padx=10, pady=6, font=("Pretendard", 9), command=self._refresh_task_table)
         self.refresh_btn.pack(side=tk.LEFT)
 
-        # 하단 상세 정보 모니터 (진행 상태 / 에러 메시지)
-        self._create_stack_label(parent, "실시간 작업 상세 모니터")
-        self.detail_text = tk.Text(parent, height=5, bg="#09090b", fg="#e4e4e7", insertbackground="#ffffff", bd=1, relief=tk.FLAT, font=("Consolas", 9))
+        # 하단 상세 정보 모니터 (실시간 상태 / 실패 사유 정밀 표시)
+        self._create_stack_label(parent, "실시간 작업 상세 모니터 (선택 작업의 상세 상태 및 실패 사유)")
+        self.detail_text = tk.Text(parent, height=8, bg="#09090b", fg="#e4e4e7", insertbackground="#ffffff", bd=1, relief=tk.FLAT, font=("Consolas", 9))
         self.detail_text.pack(fill=tk.X)
+        self.detail_text.tag_config("error", foreground="#f87171", font=("Consolas", 9, "bold"))
+        self.detail_text.tag_config("success", foreground="#4ade80", font=("Consolas", 9, "bold"))
+        self.detail_text.tag_config("info", foreground="#93c5fd")
 
     def _create_stack_label(self, parent: tk.Frame, text: str):
         lbl = tk.Label(parent, text=text, font=("Pretendard", 9, "bold"), fg="#cbd5e1", bg="#27272a")
@@ -432,7 +439,22 @@ class StudioApp(tk.Tk):
             )
 
     def _on_task_updated(self, task_data: Dict[str, Any]):
-        self.after(0, self._refresh_task_table)
+        def update_ui():
+            self._refresh_task_table()
+            # 갱신된 태스크가 현재 선택되어 있거나 실패한 경우 상세창 자동 갱신
+            selected = self.tree.selection()
+            if selected and selected[0] == task_data.get("id"):
+                self._display_task_detail(task_data)
+            elif task_data.get("status") == "FAILED":
+                # 실패 건 자동 포커스 및 실패 사유 노출
+                if not selected:
+                    try:
+                        self.tree.selection_set(task_data["id"])
+                    except Exception:
+                        pass
+                self._display_task_detail(task_data)
+
+        self.after(0, update_ui)
 
     def _on_select_row(self, event):
         selected = self.tree.selection()
@@ -441,19 +463,78 @@ class StudioApp(tk.Tk):
         task_id = selected[0]
         task = self.queue_mgr.get_task(task_id)
         if task:
-            info = f"[작업 ID] {task['id']} | [모드] {task['mode'].upper()} | [상태] {task['status']} ({task['progress']}%)\n"
-            info += f"[진행 메시지] {task.get('progress_msg', '')}\n"
-            if task.get("error_message"):
-                info += f"[오류 내용] {task['error_message']}\n"
-            if task.get("output_video_path"):
-                info += f"[출력 영상] {task['output_video_path']}\n"
-
-            self.detail_text.delete("1.0", tk.END)
-            self.detail_text.insert("1.0", info)
-
+            self._display_task_detail(task)
             if task.get("refined_prompt"):
                 self.refined_text.delete("1.0", tk.END)
                 self.refined_text.insert("1.0", task["refined_prompt"])
+
+    def _display_task_detail(self, task: Dict[str, Any]):
+        """상세 모니터에 상태 및 실패 사유 정밀 서식 출력"""
+        status = task.get("status", "UNKNOWN")
+        task_id = task.get("id", "")
+        mode = task.get("mode", "").upper()
+        title = task.get("title", "")
+        progress = task.get("progress", 0)
+        p_msg = task.get("progress_msg", "")
+        err = task.get("error_message")
+        out_v = task.get("output_video_path")
+
+        self.detail_text.delete("1.0", tk.END)
+
+        header_str = f"■ [작업 식별자] {task_id} | [모드] {mode} | [상태] {status} ({progress}%)\n"
+        header_str += f"■ [작업 명칭] {title}\n"
+        header_str += f"■ [진행 상태] {p_msg}\n"
+        self.detail_text.insert(tk.END, header_str)
+
+        if status == "FAILED" or err:
+            err_box = "=" * 75 + "\n"
+            err_box += f"❌ [실패 사유]: {err or '알 수 없는 오류'}\n"
+            err_box += "-" * 75 + "\n"
+            err_box += "💡 [조치 가이드]:\n"
+            err_box += "   1. ComfyUI 서버가 켜져 있는지 확인하십시오 (http://127.0.0.1:8188)\n"
+            err_box += "   2. 가중치 모델(models/)이 정상 다운로드되어 있는지 확인하십시오.\n"
+            err_box += "   3. 조치 후 위의 [작업 재시도] 버튼을 누르면 즉시 재실행됩니다.\n"
+            err_box += "=" * 75 + "\n"
+            self.detail_text.insert(tk.END, err_box, "error")
+        elif status == "COMPLETED" and out_v:
+            succ_str = f"✅ [생성 완료 영상]: {out_v}\n"
+            self.detail_text.insert(tk.END, succ_str, "success")
+
+    def _on_double_click_row(self, event):
+        selected = self.tree.selection()
+        if not selected:
+            return
+        task_id = selected[0]
+        task = self.queue_mgr.get_task(task_id)
+        if not task:
+            return
+
+        if task.get("status") == "FAILED":
+            err = task.get("error_message", "알 수 없는 오류")
+            retry = messagebox.askyesno(
+                "작업 실패 사유",
+                f"작업 식별자: {task_id}\n\n[실패 원인]\n{err}\n\n이 작업을 지금 재시도하시겠습니까?",
+                icon="error",
+            )
+            if retry:
+                self.queue_mgr.retry_task(task_id)
+                self._refresh_task_table()
+        elif task.get("status") == "COMPLETED":
+            self._on_open_video()
+
+    def _on_retry_task(self):
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showinfo("선택 필요", "작업 대장에서 재시도할 작업을 먼저 선택하십시오.")
+            return
+        task_id = selected[0]
+        task = self.queue_mgr.get_task(task_id)
+        if not task:
+            return
+
+        self.queue_mgr.retry_task(task_id)
+        self._refresh_task_table()
+        messagebox.showinfo("재시도 등록", f"작업 '{task_id}'이(가) 대기열에 다시 등록되었습니다.")
 
     def _on_open_video(self):
         selected = self.tree.selection()

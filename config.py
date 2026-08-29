@@ -145,6 +145,10 @@ class StudioConfig:
     active_profile: str = "VRAM_16GB_BALANCED"
 
     @property
+    def vae_model(self) -> str:
+        return self.video_vae_model
+
+    @property
     def profile(self) -> HardwareProfile:
         return HARDWARE_PROFILES.get(
             self.active_profile, HARDWARE_PROFILES["VRAM_16GB_BALANCED"]
