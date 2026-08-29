@@ -15,11 +15,21 @@ INPUTS_DIR = WORKSPACE_DIR / "inputs"
 OUTPUTS_DIR = WORKSPACE_DIR / "outputs"
 WORKFLOWS_DIR = WORKSPACE_DIR / "workflows"
 MODELS_DIR = WORKSPACE_DIR / "models"
+SAMPLES_DIR = WORKSPACE_DIR / "samples"
 DB_PATH = WORKSPACE_DIR / "video_studio.db"
 
 # 기본 디렉터리 자동 생성
-for d in [INPUTS_DIR, OUTPUTS_DIR, WORKFLOWS_DIR, MODELS_DIR]:
+for d in [INPUTS_DIR, OUTPUTS_DIR, WORKFLOWS_DIR, MODELS_DIR, SAMPLES_DIR]:
     d.mkdir(parents=True, exist_ok=True)
+
+# 샘플 프롬프트 프리셋 목록
+SAMPLE_PROMPTS = {
+    "선택 안 함 (직접 작성)": "",
+    "01. 사이버펑크 서울 밤거리 (T2V)": "01_T2V_Cyberpunk_Seoul_Night.md",
+    "02. 조커 느와르 워킹 (T2V - 영상 예시)": "02_T2V_Joker_Noir_Walking.md",
+    "03. 고대 유적 로봇 탐험 (T2V)": "03_T2V_Ancient_Explorer_Robot.md",
+    "04. 3단 씬 우주 탐사 (Storyboard)": "04_Storyboard_Multi_Scene_SciFi.md",
+}
 
 
 # 화면비 프리셋

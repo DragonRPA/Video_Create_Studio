@@ -23,6 +23,8 @@ from config import (
     CAMERA_PRESETS,
     LIGHTING_PRESETS,
     OUTPUTS_DIR,
+    SAMPLES_DIR,
+    SAMPLE_PROMPTS,
 )
 from task_queue_manager import TaskQueueManager
 from prompt_refiner import PromptRefiner
@@ -166,7 +168,28 @@ class StudioApp(tk.Tk):
 
     def _build_prompt_section(self, parent: tk.Frame):
         """프롬프트 입력 및 프리셋 빌더 (카테고리 3.4 상하 세로 스택)"""
-        # 프리셋 선택기 (가로 2열 배치)
+        # 1. 샘플 프롬프트 및 파일 로더 툴바
+        sample_bar = tk.Frame(parent, bg="#27272a")
+        sample_bar.pack(fill=tk.X, pady=(0, 6))
+
+        sample_col = tk.Frame(sample_bar, bg="#27272a")
+        sample_col.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 4))
+        self._create_stack_label(sample_col, "샘플 프롬프트 프리셋 불러오기")
+        self.sample_var = tk.StringVar(value=list(SAMPLE_PROMPTS.keys())[0])
+        sample_combo = ttk.Combobox(sample_col, textvariable=self.sample_var, values=list(SAMPLE_PROMPTS.keys()), state="readonly")
+        sample_combo.pack(fill=tk.X)
+        sample_combo.bind("<<ComboboxSelected>>", self._on_select_sample_preset)
+
+        btn_group = tk.Frame(sample_bar, bg="#27272a")
+        btn_group.pack(side=tk.RIGHT, pady=(16, 0))
+
+        self.open_file_btn = tk.Button(btn_group, text="파일 열기", bg="#4f46e5", fg="#ffffff", bd=0, padx=8, pady=3, font=("Pretendard", 9, "bold"), command=self._on_open_prompt_file)
+        self.open_file_btn.pack(side=tk.LEFT, padx=(0, 4))
+
+        self.run_sample_btn = tk.Button(btn_group, text="샘플 즉시 실행", bg="#10b981", fg="#ffffff", bd=0, padx=8, pady=3, font=("Pretendard", 9, "bold"), command=self._on_run_sample_immediately)
+        self.run_sample_btn.pack(side=tk.LEFT)
+
+        # 2. 프리셋 선택기 (가로 2열 배치)
         preset_frame = tk.Frame(parent, bg="#27272a")
         preset_frame.pack(fill=tk.X, pady=(0, 6))
 
@@ -184,7 +207,7 @@ class StudioApp(tk.Tk):
         lighting_combo = ttk.Combobox(col2, textvariable=self.lighting_var, values=LIGHTING_PRESETS, state="readonly")
         lighting_combo.pack(fill=tk.X)
 
-        # 지시문 입력창
+        # 3. 지시문 입력창
         self._create_stack_label(parent, "사용자 지시문")
         self.prompt_text = tk.Text(parent, height=3, bg="#09090b", fg="#ffffff", insertbackground="#ffffff", bd=1, relief=tk.FLAT, font=("Pretendard", 9))
         self.prompt_text.pack(fill=tk.X, pady=(0, 4))
@@ -195,8 +218,8 @@ class StudioApp(tk.Tk):
         self.refine_btn = tk.Button(btn_bar, text="마크다운 프롬프트 자동 변환", bg="#3b82f6", fg="#ffffff", bd=0, padx=8, pady=4, font=("Pretendard", 9, "bold"), command=self._on_click_refine)
         self.refine_btn.pack(side=tk.RIGHT)
 
-        # 정제된 마크다운 결과창
-        self._create_stack_label(parent, "MiniMax H3 규격 마크다운")
+        # 4. 정제된 마크다운 결과창
+        self._create_stack_label(parent, "MiniMax H3 규격 마크다운 (수정 및 직접 입력 가능)")
         self.refined_text = tk.Text(parent, height=6, bg="#09090b", fg="#93c5fd", insertbackground="#ffffff", bd=1, relief=tk.FLAT, font=("Consolas", 9))
         self.refined_text.pack(fill=tk.BOTH, expand=True, pady=(0, 6))
 
@@ -352,6 +375,83 @@ class StudioApp(tk.Tk):
             self.after(0, lambda: self.status_lbl.configure(text=txt, fg=color))
 
         threading.Thread(target=check, daemon=True).start()
+
+    def _on_select_sample_preset(self, event=None):
+        """샘플 프리셋 선택 시 해당 마크다운 파일 자동 로드"""
+        import re
+        choice = self.sample_var.get()
+        filename = SAMPLE_PROMPTS.get(choice)
+        if not filename:
+            return
+
+        sample_file = SAMPLES_DIR / filename
+        if sample_file.exists():
+            try:
+                with open(sample_file, "r", encoding="utf-8") as f:
+                    content = f.read()
+
+                self.refined_text.delete("1.0", tk.END)
+                self.refined_text.insert("1.0", content)
+
+                # Core Idea 추출하여 사용자 지시문 창에 요약 노출
+                core_match = re.search(r"### \[Block 2: Core Idea\]\s*([\s\S]*?)(?=###|\Z)", content)
+                summary = core_match.group(1).strip() if core_match else choice
+                self.prompt_text.delete("1.0", tk.END)
+                self.prompt_text.insert("1.0", summary)
+
+                # 모드 탭 자동 전환
+                if "Storyboard" in choice:
+                    self.mode_notebook.select(3)
+                else:
+                    self.mode_notebook.select(0)
+            except Exception as e:
+                messagebox.showerror("파일 오류", f"샘플 파일을 읽을 수 없습니다:\n{e}")
+
+    def _on_open_prompt_file(self):
+        """사용자가 직접 파일 탐색기로 프롬프트 마크다운 파일 선택"""
+        fpath = filedialog.askopenfilename(
+            initialdir=str(SAMPLES_DIR),
+            title="프롬프트 마크다운 파일 선택",
+            filetypes=[("마크다운 파일", "*.md"), ("텍스트 파일", "*.txt"), ("모든 파일", "*.*")],
+        )
+        if not fpath:
+            return
+
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                content = f.read()
+            self.refined_text.delete("1.0", tk.END)
+            self.refined_text.insert("1.0", content)
+            self.prompt_text.delete("1.0", tk.END)
+            self.prompt_text.insert("1.0", f"파일에서 로드됨: {Path(fpath).name}")
+        except Exception as e:
+            messagebox.showerror("파일 오류", f"파일을 열 수 없습니다:\n{e}")
+
+    def _on_run_sample_immediately(self):
+        """현재 로드된 샘플 또는 기본 샘플을 즉시 대기열에 등록하고 실행"""
+        refined = self.refined_text.get("1.0", tk.END).strip()
+        if not refined:
+            # 아직 로드되지 않았으면 첫 번째 샘플 로드
+            first_key = list(SAMPLE_PROMPTS.keys())[1]
+            self.sample_var.set(first_key)
+            self._on_select_sample_preset()
+            refined = self.refined_text.get("1.0", tk.END).strip()
+
+        preset_name = self.sample_var.get()
+        title = f"SAMPLE_{preset_name.split('.')[1].strip() if '.' in preset_name else 'T2V_Sample'}"
+
+        current_tab = self.mode_notebook.index(self.mode_notebook.select())
+        mode_map = {0: "t2v", 1: "i2v", 2: "r2v", 3: "storyboard"}
+        mode = mode_map.get(current_tab, "t2v")
+
+        task_id = self.queue_mgr.add_task(
+            title=title,
+            raw_prompt=refined,
+            mode=mode,
+        )
+        self.queue_mgr.update_task_status(task_id, "PENDING", 0, refined_prompt=refined)
+        self._refresh_task_table()
+        messagebox.showinfo("샘플 실행 등록", f"샘플 작업 '{title}' (ID: {task_id})이(가) 대기열에 즉시 등록되었습니다!")
 
     def _on_click_refine(self):
         raw_text = self.prompt_text.get("1.0", tk.END).strip()

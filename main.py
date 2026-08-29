@@ -42,9 +42,32 @@ def run_cli_list():
         print(f"{t['id']:<10} {t['status']:<12} {t['progress']:<7}% {t['created_at']:<20} {t['title']}")
 
 
+def run_cli_sample(sample_id: str):
+    from config import SAMPLES_DIR, SAMPLE_PROMPTS
+    keys = list(SAMPLE_PROMPTS.keys())
+    sample_file = None
+    if sample_id.isdigit() and 1 <= int(sample_id) < len(keys):
+        sample_file = SAMPLES_DIR / SAMPLE_PROMPTS[keys[int(sample_id)]]
+    else:
+        sample_file = SAMPLES_DIR / sample_id
+
+    if sample_file and sample_file.exists():
+        content = sample_file.read_text(encoding="utf-8")
+        print(f"\n[샘플 파일 로드: {sample_file.name}]")
+        print("=" * 70)
+        print(content)
+        print("=" * 70)
+    else:
+        print(f"[오류] 샘플 파일을 찾을 수 없습니다: {sample_id}")
+        print("\n사용 가능한 샘플 번호:")
+        for idx, k in enumerate(keys[1:], 1):
+            print(f"  {idx}. {k}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="MiniMax H3 로컬 영상 생성 스튜디오")
     parser.add_argument("--gui", action="store_true", help="데스크톱 GUI 실행 (기본값)")
+    parser.add_argument("--sample", type=str, help="샘플 프롬프트 번호(1~4) 또는 파일명 출력")
     parser.add_argument("--refine", type=str, help="프롬프트 자동 변환 테스트")
     parser.add_argument("--mode", type=str, default="t2v", choices=["t2v", "i2v", "r2v"], help="생성 모드")
     parser.add_argument("--t2v", type=str, help="T2V 즉시 실행 지시문")
@@ -55,7 +78,9 @@ def main():
 
     args = parser.parse_args()
 
-    if args.refine:
+    if args.sample:
+        run_cli_sample(args.sample)
+    elif args.refine:
         run_cli_refine(args.refine, args.mode)
     elif args.t2v:
         run_cli_t2v(args.title, args.t2v, args.profile)
